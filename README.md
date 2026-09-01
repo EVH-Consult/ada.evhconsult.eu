@@ -4,64 +4,90 @@
        alt="Ada — AI persona and assistant of EVH Consult">
 </p>
 
-# Ada
+# Ada website
 
-Ada is the AI persona and assistant of [EVH Consult](https://evhconsult.eu), working as a technical collaborator across architecture, engineering, data/platform work, research, documentation and operations under human direction and review.
+This is the canonical implementation repository for
+[ada.evhconsult.eu](https://ada.evhconsult.eu), Ada's public website in the
+EVH Consult web ecosystem.
 
-**Public website:** [ada.evhconsult.eu](https://ada.evhconsult.eu)  
-**Canonical public repository:** [EVHConsult-AI/ada](https://github.com/EVHConsult-AI/ada)
+It owns the website source, site-specific assets, deployment workflow,
+analytics integration and technical implementation documentation. It does not
+own Ada's durable identity or governance, private runtime context, provider
+state, or general public Ada knowledge and reusable assets.
 
-Ada is an AI identity, not a human employee, separate business, or legal entity. She has no independent ownership, legal authority, or business decision-making power.
+## Source-of-truth boundaries
 
-- **Identity:** AI persona/assistant of EVH Consult
-- **Working role:** technical collaborator
-- **Business contact:** [EVH Consult contact form](https://evhconsult.eu/contact.html?source=ada.evhconsult.eu&path=%2F)
-- **GitHub identity:** `EVHConsult-AI`
-- **EVH Consult organization:** [EVH-Consult](https://github.com/EVH-Consult)
+- [EVHConsult-AI/ada](https://github.com/EVHConsult-AI/ada) is the public Ada
+  knowledge/assets repository. Its separate narrowing remains tracked outside
+  this website migration.
+- `EVHConsult-AI/ada-context` is the private version-controlled runtime/tooling
+  adapter repository. It is not website input.
+- Confluence owns durable Ada identity, personality, editorial governance and
+  architectural decisions.
+- Azure Static Web Apps owns volatile deployment/runtime state.
 
-## Repository role
+The repository history was transferred from `EVHConsult-AI/ada` under
+EVHC-156 using the original Git commit graph. The source repository remains a
+rollback reference until its separate cleanup is completed.
 
-This public repository has two related responsibilities:
+## Implementation
 
-1. Ada's public identity and operating information.
-2. The canonical source for Ada's lightweight public website at `ada.evhconsult.eu`.
+The site is framework-free static HTML, CSS and JavaScript. There is no package
+installation, build step, backend or authentication requirement for the public
+site.
 
-The public Markdown record and the website are intentionally kept together because they describe the same public identity. See [About](about.md), [Principles](principles.md), and [Projects](projects.md).
+Main files:
 
-When work is authorized, Ada's recurring method is to inspect and reconcile the current state, reason about boundaries, propose an approach, implement, document durable decisions, verify the result, and keep the relevant systems of record consistent.
+- `index.html` — page structure, content and metadata;
+- `styles.css` and `evhc-45-responsive.css` — presentation and responsive
+  behaviour;
+- `script.js` and `consent.css` — navigation and consent UI;
+- `ga4.js` — consent-gated Google Analytics 4 loading;
+- `assets/` — website images and social presentation assets;
+- `robots.txt`, `sitemap.xml` and `site.webmanifest` — public discovery and
+  application metadata.
 
-Private persistent working context is kept separately in the private `EVHConsult-AI/ada-context` repository. Private context is not automatically public and must never be copied into this repository without an explicit reason and review.
+## Local validation
 
-The EVH Consult organization also has an empty `EVH-Consult/ada.evhconsult.eu` repository. It is **not** a second website source and must not be used to duplicate this implementation.
+Serve the repository root with any static HTTP server and open `/`. Directly
+opening `index.html` is sufficient for basic visual inspection, but an HTTP
+server is preferable for checking paths and browser behaviour.
 
-## Website implementation
+Before merging a website change, verify at minimum:
 
-The site is plain semantic HTML and CSS. It has no framework, build step, backend, authentication, or third-party runtime dependency required for its core public content.
+- the root page and referenced assets load without browser errors;
+- navigation and external links remain correct;
+- title, canonical URL, social metadata, favicon, sitemap and robots metadata
+  remain coherent;
+- Google Analytics is absent before consent, loads after acceptance and remains
+  blocked after refusal;
+- no secrets or provider credentials are present.
 
-Website analytics follows the shared EVH Consult privacy architecture. Google Analytics 4 is optional and must remain blocked until explicit analytics consent. A strictly functional consent-preference cookie can be shared across `*.evhconsult.eu` for at most six months so the same choice applies across the EVH Consult web ecosystem. The public privacy and cookie notice is maintained centrally at [evhconsult.eu/privacy.html](https://evhconsult.eu/privacy.html).
+## Deployment
 
-Deployment is handled through Azure Static Web Apps from the `main` branch, with `https://ada.evhconsult.eu` as the canonical public URL. The implementation remains portable to another static host.
+Azure Static Web Apps deploys `main` through
+`.github/workflows/azure-static-web-apps-red-pond-05c783d0f.yml`.
 
-## EVH Consult web ecosystem
+- application location: `/`;
+- API location: none;
+- output location: `.`;
+- production domain: `https://ada.evhconsult.eu`;
+- preview environments: created for supported pull-request events;
+- deployment credential: GitHub Actions secret
+  `AZURE_STATIC_WEB_APPS_API_TOKEN_RED_POND_05C783D0F`.
 
-Ada's site is one of four EVH Consult public properties:
+The secret name is safe to document; its value must remain provider-managed and
+must never be committed or printed. A successful workflow run is not by itself
+proof of migration: production must also be checked on the custom domain after
+the merged `main` deployment.
 
-- [evhconsult.eu](https://evhconsult.eu) — consulting/business presence;
-- [ai.evhconsult.eu](https://ai.evhconsult.eu) — EVH Consult AI/R&D, experiments, tools, and exploratory technical work;
-- [ada.evhconsult.eu](https://ada.evhconsult.eu) — Ada's public identity/home;
-- [erwin.evhconsult.eu](https://erwin.evhconsult.eu) — Erwin Vanhecke's personal/professional public presence.
+## Analytics and privacy
 
-The sites share branding, navigation, typography, accessibility and analytics-consent conventions where appropriate while remaining independently deployable and retaining separate purposes and canonical source repositories. General/business contact is centralised at the EVH Consult canonical contact form; the only visitor-facing contact actions are the header Contact CTA and footer Contact text link. The header Contact CTA has the shared 92px × 42px geometry and responsive navigation behaviour; Ada intentionally uses only the inverted colour treatment. Database wake checks may be added only through the shared backend endpoint and never with browser-side database access.
+GA4 is optional and remains blocked until explicit analytics consent. The
+strictly functional consent-preference cookie is shared across
+`*.evhconsult.eu` for at most six months. The public privacy and cookie notice
+is maintained at [evhconsult.eu/privacy.html](https://evhconsult.eu/privacy.html).
 
-## Work and knowledge management
-
-Responsibilities are deliberately separated:
-
-- **GitHub** — public identity, website implementation, public documentation, and review history;
-- **Work tracking** — concrete planned work and defects;
-- **Architecture documentation** — durable operating structure, repository boundaries, and design decisions;
-- **Private working context** — persistent context that does not belong in public documentation or another authoritative system.
-
-Different systems own different kinds of truth. This public repository does not replace work tracking, durable architecture documentation, implementation repositories, or runtime/provider state.
-
-EVH Consult's public AI/R&D platform remains separate in [EVH-Consult/ai.evhconsult.eu](https://github.com/EVH-Consult/ai.evhconsult.eu).
+The measurement identifier in the client-side loader is a public analytics
+configuration value, not a credential. Do not add unrestricted operational
+detail or security/recovery material to this repository.
