@@ -17,9 +17,9 @@ state, or general public Ada knowledge and reusable assets.
 
 ## Source-of-truth boundaries
 
-- [EVHConsult-AI/ada](https://github.com/EVHConsult-AI/ada) is the public Ada
-  knowledge/assets repository. Its separate narrowing remains tracked outside
-  this website migration.
+- [EVHConsult-AI/ada](https://github.com/EVHConsult-AI/ada) is the reviewed
+  public Ada knowledge/assets repository. It was narrowed under EVHC-158 and
+  no longer contains or owns website implementation.
 - `EVHConsult-AI/ada-context` is the private version-controlled runtime/tooling
   adapter repository. It is not website input.
 - Confluence owns durable Ada identity, personality, editorial governance and
@@ -27,8 +27,9 @@ state, or general public Ada knowledge and reusable assets.
 - Azure Static Web Apps owns volatile deployment/runtime state.
 
 The repository history was transferred from `EVHConsult-AI/ada` under
-EVHC-156 using the original Git commit graph. The source repository remains a
-rollback reference until its separate cleanup is completed.
+EVHC-156 using the original Git commit graph. Historical commits therefore
+preserve evidence of the earlier combined repository model, while the current
+public Ada repository and website repository now have separate responsibilities.
 
 ## Implementation
 
@@ -80,6 +81,11 @@ The secret name is safe to document; its value must remain provider-managed and
 must never be committed or printed. A successful workflow run is not by itself
 proof of migration: production must also be checked on the custom domain after
 the merged `main` deployment.
+
+EVHC-156 established this repository as the production source. The verified
+migration merge is `0c9ff648403c4ba6a230e6ff8f150bece814bdb4`, deployed by
+GitHub Actions run `33588455461`. EVHC-158 subsequently removed the legacy
+website/deployment responsibility from `EVHConsult-AI/ada`.
 
 ## Analytics and privacy
 
