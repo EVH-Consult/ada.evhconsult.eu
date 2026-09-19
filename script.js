@@ -216,30 +216,48 @@
       if (event.key === 'Escape' && settingsMode && !panel.hidden) closePanel();
     });
 
-    document.querySelectorAll('.footer-links, .footer-nav').forEach((footerLinks) => {
-      const existingPrivacy = Array.from(footerLinks.querySelectorAll('a')).find((link) => link.href === PRIVACY_URL);
-      if (!existingPrivacy && !footerLinks.querySelector('[data-privacy-link]')) {
-        const privacy = document.createElement('a');
+    document.querySelectorAll('.site-footer').forEach((footer) => {
+      const copyright = Array.from(footer.querySelectorAll('p')).find((item) => item.textContent.includes('©'));
+      if (!copyright) return;
+      copyright.classList.add('footer-copyright');
+
+      let meta = footer.querySelector('.footer-meta');
+      if (!meta) {
+        meta = document.createElement('div');
+        meta.className = 'footer-meta';
+        copyright.replaceWith(meta);
+        meta.appendChild(copyright);
+      }
+
+      let controls = meta.querySelector('.footer-policy-links');
+      if (!controls) {
+        controls = document.createElement('nav');
+        controls.className = 'footer-policy-links';
+        controls.setAttribute('aria-label', 'Privacy and cookie controls');
+        meta.appendChild(controls);
+      }
+
+      let settings = footer.querySelector('[data-cookie-settings]');
+      if (!settings) {
+        settings = document.createElement('button');
+        settings.type = 'button';
+        settings.className = 'evh-cookie-settings';
+        settings.textContent = 'Cookie settings';
+        settings.dataset.cookieSettings = '';
+      }
+
+      let privacy = footer.querySelector('[data-privacy-link]')
+        || Array.from(footer.querySelectorAll('a')).find((link) => link.href === PRIVACY_URL);
+      if (!privacy) {
+        privacy = document.createElement('a');
         privacy.href = PRIVACY_URL;
         privacy.textContent = 'Privacy & cookies';
         privacy.dataset.privacyLink = '';
-        footerLinks.appendChild(privacy);
       }
-    });
 
-    document.querySelectorAll('.site-footer [data-cookie-settings]').forEach((button) => button.remove());
-    const copyright = Array.from(document.querySelectorAll('.site-footer p')).find((item) => item.textContent.includes('©'));
-    if (copyright && !copyright.querySelector('[data-cookie-settings]')) {
-      const wrapper = document.createElement('span');
-      wrapper.className = 'evh-footer-settings';
-      const settings = document.createElement('button');
-      settings.type = 'button';
-      settings.className = 'evh-cookie-settings';
-      settings.textContent = 'Cookie settings';
-      settings.dataset.cookieSettings = '';
-      wrapper.appendChild(settings);
-      copyright.appendChild(wrapper);
-    }
+      controls.append(settings, privacy);
+      footer.querySelector('.evh-footer-settings')?.remove();
+    });
 
     document.querySelectorAll('[data-cookie-settings]').forEach((button) => {
       button.addEventListener('click', () => openPanel(true, button));
