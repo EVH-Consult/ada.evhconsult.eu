@@ -8,7 +8,7 @@
 
 This is the canonical implementation repository for
 [ada.evhconsult.eu](https://ada.evhconsult.eu), Ada's public website in the
-EVH Consult web ecosystem.
+EVH Consult ecosystem.
 
 It owns the website source, site-specific assets, deployment workflow,
 analytics integration and technical implementation documentation. It does not
@@ -93,6 +93,10 @@ GA4 is optional and remains blocked until explicit analytics consent. The
 strictly functional consent-preference cookie is shared across
 `*.evhconsult.eu` for at most six months. The public privacy and cookie notice
 is maintained at [evhconsult.eu/privacy.html](https://evhconsult.eu/privacy.html).
+
+Page identity uses `hostname` + `page_path`; `page_title` remains human-readable
+presentation. This site uses identity-first titles beginning with `Ada —` and
+reports `content_group = Ada` only after analytics consent.
 
 The measurement identifier in the client-side loader is a public analytics
 configuration value, not a credential. Do not add unrestricted operational

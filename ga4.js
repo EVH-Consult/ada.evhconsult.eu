@@ -8,10 +8,22 @@
   ]);
   const CHANGE_EVENT = 'evh:analytics-consent-changed';
   const COOKIE_EXPIRES_SECONDS = 13 * 30 * 24 * 60 * 60;
+  const CONTENT_GROUP_BY_HOST = Object.freeze({
+    'evhconsult.eu': 'Consulting',
+    'ai.evhconsult.eu': 'AI/R&D',
+    'ada.evhconsult.eu': 'Ada',
+    'erwin.evhconsult.eu': 'Erwin'
+  });
   let loaded = false;
 
   const isApprovedHost = () => APPROVED_HOSTS.has(window.location.hostname);
   const hasAnalyticsConsent = () => window.EVHConsent?.getAnalyticsConsent?.() === true;
+  const getContentGroup = () => {
+    if (window.location.hostname === 'evhconsult.eu' && window.location.pathname === '/contact.html') {
+      return 'Shared';
+    }
+    return CONTENT_GROUP_BY_HOST[window.location.hostname];
+  };
 
   const load = () => {
     if (loaded || !isApprovedHost() || !hasAnalyticsConsent()) return;
@@ -24,6 +36,7 @@
     window.gtag('config', MEASUREMENT_ID, {
       allow_google_signals: false,
       allow_ad_personalization_signals: false,
+      content_group: getContentGroup(),
       cookie_expires: COOKIE_EXPIRES_SECONDS,
       cookie_update: false
     });
