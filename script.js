@@ -82,9 +82,57 @@
     return value === 'granted' || value === 'denied' ? value : null;
   };
 
-  // Google checks this opt-out flag before sending, including queued/automatic
-  // events. Read the shared cookie at that boundary, even while this tab is
-  // backgrounded and its synchronization callbacks have not run yet.
+  // The Google opt-out flag suppresses new events, but does not cancel
+  // an already-buffered batch. Revalidate at the browser dispatch boundary.
+  // Only GA collection endpoints are affected; other requests remain native.
+  const blockGaDispatch = (input) => {
+    if (readChoice() === 'granted') return false;
+    try {
+      const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url, location.href);
+      return (url.protocol === 'https:' || url.protocol === 'http:') &&
+        (url.hostname === 'google-analytics.com' || url.hostname.endsWith('.google-analytics.com')) &&
+        /^\/(?:g\/|j\/)?collect$/.test(url.pathname);
+    } catch { return false; }
+  };
+  if (typeof window.navigator?.sendBeacon === 'function') {
+    const sendBeacon = window.navigator.sendBeacon;
+    window.navigator.sendBeacon = function (url, data) {
+      // Report a discarded GA batch as handled so the tag cannot retry it.
+      return blockGaDispatch(url) || sendBeacon.call(this, url, data);
+    };
+  }
+  if (typeof window.fetch === 'function') {
+    const fetch = window.fetch;
+    window.fetch = function (input, options) {
+      if (blockGaDispatch(input)) return Promise.resolve(new Response(null, { status: 204 }));
+      return fetch.call(this, input, options);
+    };
+  }
+  const imagePrototype = window.HTMLImageElement?.prototype;
+  const imageSrc = imagePrototype && Object.getOwnPropertyDescriptor(imagePrototype, 'src');
+  if (imageSrc?.configurable && imageSrc.set) {
+    Object.defineProperty(imagePrototype, 'src', {
+      ...imageSrc,
+      set(value) { if (!blockGaDispatch(value)) imageSrc.set.call(this, value); }
+    });
+  }
+  const xhrPrototype = window.XMLHttpRequest?.prototype;
+  if (xhrPrototype) {
+    const targets = new WeakMap();
+    const open = xhrPrototype.open, send = xhrPrototype.send;
+    xhrPrototype.open = function (method, url, ...options) {
+      const result = open.call(this, method, url, ...options);
+      targets.set(this, url);
+      return result;
+    };
+    xhrPrototype.send = function (body) {
+      if (!blockGaDispatch(targets.get(this))) return send.call(this, body);
+      this.abort();
+    };
+  }
+
+  // Read the shared cookie when Google checks its event opt-out flag, even
+  // while this tab is backgrounded and synchronization callbacks are delayed.
   let explicitlyDisabled = true;
   Object.defineProperty(window, `ga-disable-${GA_MEASUREMENT_ID}`, {
     configurable: false,

@@ -115,8 +115,11 @@ Advertising consent stays denied. Expiry opens the consent prompt again.
 The tag is configured once per document, so refusal/regrant does not send a
 second initial page view. `EVHAnalytics.isLoaded()` reports whether tracking is
 currently available; `track()` rechecks consent and the exact production host
-and returns whether it enqueued the event. The opt-out accessor also protects
-automatic or queued Google events when another context changes the cookie.
+and returns whether it enqueued the event. The opt-out accessor suppresses
+new Google events after another context changes the cookie. A separate dispatch
+guard drops buffered GA collection requests when the shared preference is no
+longer granted. It covers beacon, fetch, image and XHR transports only for Google
+Analytics collection endpoints; other network requests retain native behaviour.
 
 Run the behavioral regressions with `node --test tests/*.test.cjs` (AI site:
 `node --test src/web/tests/*.test.cjs` from the repository root). Real production
