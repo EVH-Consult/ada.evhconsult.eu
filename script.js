@@ -77,9 +77,21 @@
     const prefix = `${COOKIE_NAME}=`;
     const match = document.cookie.split(';').map((part) => part.trim()).find((part) => part.startsWith(prefix));
     if (!match) return null;
-    const value = decodeURIComponent(match.slice(prefix.length));
+    let value;
+    try { value = decodeURIComponent(match.slice(prefix.length)); } catch { return null; }
     return value === 'granted' || value === 'denied' ? value : null;
   };
+
+  // Google checks this opt-out flag before sending, including queued/automatic
+  // events. Read the shared cookie at that boundary, even while this tab is
+  // backgrounded and its synchronization callbacks have not run yet.
+  let explicitlyDisabled = true;
+  Object.defineProperty(window, `ga-disable-${GA_MEASUREMENT_ID}`, {
+    configurable: false,
+    get: () => explicitlyDisabled || readChoice() !== 'granted',
+    set: (disabled) => { explicitlyDisabled = disabled !== false; }
+  });
+  let appliedChoice = null;
 
   const writeChoice = (choice) => {
     const attributes = [`${COOKIE_NAME}=${encodeURIComponent(choice)}`, 'Path=/', `Max-Age=${COOKIE_MAX_AGE}`, 'SameSite=Lax'];
@@ -109,6 +121,7 @@
 
   const applyChoice = (choice, persist = false) => {
     if (persist) writeChoice(choice);
+    appliedChoice = choice;
     const granted = choice === 'granted';
     window[`ga-disable-${GA_MEASUREMENT_ID}`] = !granted;
     window.gtag('consent', 'update', consentState(granted ? 'granted' : 'denied'));
@@ -117,13 +130,27 @@
   };
 
   const initialChoice = readChoice();
-  if (initialChoice) applyChoice(initialChoice);
+  applyChoice(initialChoice);
+
+  const synchronize = () => {
+    const choice = readChoice();
+    if (choice !== appliedChoice) applyChoice(choice);
+    return choice;
+  };
+  window.addEventListener('focus', synchronize);
+  window.addEventListener('pageshow', synchronize);
+  document.addEventListener('visibilitychange', synchronize);
+  window.cookieStore?.addEventListener('change', synchronize);
+  // Cookie Store is not universal and storage/BroadcastChannel are origin-bound.
+  // Poll only the functional cookie as a cross-subdomain fallback; never renew it.
+  window.setInterval(synchronize, 250);
 
   window.EVHConsent = Object.freeze({
     cookieName: COOKIE_NAME,
     measurementId: GA_MEASUREMENT_ID,
-    getChoice: readChoice,
-    getAnalyticsConsent: () => readChoice() === 'granted',
+    getChoice: synchronize,
+    getAnalyticsConsent: () => synchronize() === 'granted',
+    synchronize,
     changeEvent: CHANGE_EVENT
   });
 
@@ -170,7 +197,7 @@
     let settingsMode = false;
 
     const renderStatus = () => {
-      const choice = readChoice();
+      const choice = synchronize();
       acceptButton.disabled = choice === 'granted';
       refuseButton.disabled = choice === 'denied';
       status.textContent = choice === 'granted'
@@ -179,6 +206,11 @@
           ? 'Analytics is currently refused.'
           : 'No analytics choice has been stored. Analytics remains blocked until you accept.';
     };
+
+    window.addEventListener(CHANGE_EVENT, () => {
+      if (!readChoice() && panel.hidden) openPanel(false);
+      else if (!panel.hidden) renderStatus();
+    });
 
     const openPanel = (asSettings = true, trigger = null) => {
       settingsMode = asSettings;
