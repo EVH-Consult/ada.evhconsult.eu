@@ -153,22 +153,26 @@
     panel.innerHTML = `
       <h2 id="evh-consent-title">Analytics cookies</h2>
       <p>EVH Consult uses Google Analytics 4 only with your consent for aggregate site use, regional/campaign effectiveness and successful contact requests. It is not used for advertising or remarketing.</p>
-      <p class="evh-consent-status" data-consent-status></p>
+      <p id="evh-consent-status" class="evh-consent-status" data-consent-status aria-live="polite"></p>
       <p><a href="${PRIVACY_URL}">Privacy &amp; cookie information</a></p>
       <div class="evh-consent-actions">
-        <button type="button" data-consent-accept>Accept analytics</button>
-        <button type="button" data-consent-refuse>Refuse analytics</button>
+        <button type="button" data-consent-accept aria-describedby="evh-consent-status">Accept analytics</button>
+        <button type="button" data-consent-refuse aria-describedby="evh-consent-status">Refuse analytics</button>
         <button type="button" data-consent-close>Close</button>
       </div>`;
     document.body.appendChild(panel);
 
     const status = panel.querySelector('[data-consent-status]');
+    const acceptButton = panel.querySelector('[data-consent-accept]');
+    const refuseButton = panel.querySelector('[data-consent-refuse]');
     const closeButton = panel.querySelector('[data-consent-close]');
     let returnFocus = null;
     let settingsMode = false;
 
     const renderStatus = () => {
       const choice = readChoice();
+      acceptButton.disabled = choice === 'granted';
+      refuseButton.disabled = choice === 'denied';
       status.textContent = choice === 'granted'
         ? 'Analytics is currently allowed.'
         : choice === 'denied'
@@ -199,11 +203,11 @@
       returnFocus = null;
     };
 
-    panel.querySelector('[data-consent-accept]').addEventListener('click', () => {
+    acceptButton.addEventListener('click', () => {
       applyChoice('granted', true);
       closePanel();
     });
-    panel.querySelector('[data-consent-refuse]').addEventListener('click', () => {
+    refuseButton.addEventListener('click', () => {
       applyChoice('denied', true);
       closePanel();
     });
