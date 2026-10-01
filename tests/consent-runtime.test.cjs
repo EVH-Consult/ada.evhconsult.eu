@@ -198,3 +198,22 @@ test('denial leaves contact, reporting, assets and lookalike hosts native', asyn
     assert.equal(r.dispatches.length - count, 4, url);
   }
 });
+
+for (const host of hosts) {
+  test(`late GA cookies are removed while preference remains denied on ${host}`, () => {
+    for (const next of ['denied', null, '%broken']) {
+      const jar = {evh_analytics_consent: 'granted'};
+      const r = realm(jar, host);
+      if (next === null) delete jar.evh_analytics_consent; else jar.evh_analytics_consent = next;
+      r.window.EVHConsent.synchronize();
+      // A delayed Google task can recreate a cookie after the first cleanup.
+      jar._ga = 'late'; jar._ga_QJKQTTXSF3 = 'late'; jar.functional = 'keep';
+      const preferenceWrites = r.writes.filter(x => x.startsWith('evh_analytics_consent=')).length;
+      r.timers.forEach(fn => fn());
+      assert.ok(!('_ga' in jar)); assert.ok(!('_ga_QJKQTTXSF3' in jar));
+      assert.equal(jar.functional, 'keep');
+      assert.equal(r.writes.filter(x => x.startsWith('evh_analytics_consent=')).length, preferenceWrites);
+      assert.equal(r.window[id], true);
+    }
+  });
+}

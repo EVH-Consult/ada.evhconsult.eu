@@ -183,6 +183,7 @@
   const synchronize = () => {
     const choice = readChoice();
     if (choice !== appliedChoice) applyChoice(choice);
+    else if (choice !== 'granted') deleteGaCookies();
     return choice;
   };
   window.addEventListener('focus', synchronize);
