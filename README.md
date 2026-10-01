@@ -101,3 +101,23 @@ reports `content_group = Ada` only after analytics consent.
 The measurement identifier in the client-side loader is a public analytics
 configuration value, not a credential. Do not add unrestricted operational
 detail or security/recovery material to this repository.
+
+## Consent synchronization
+
+The functional shared cookie is re-read at the Google opt-out boundary and before
+custom-event emission. A denied, missing or malformed preference disables
+collection even before this document runs its synchronization callbacks. Focus,
+page show (including bfcache), visibility and Cookie Store changes reapply the
+Google consent state; a 250 ms cookie poll covers browsers without Cookie Store
+and changes from other subdomains. The poll never renews the 180-day preference.
+Advertising consent stays denied. Expiry opens the consent prompt again.
+
+The tag is configured once per document, so refusal/regrant does not send a
+second initial page view. `EVHAnalytics.isLoaded()` reports whether tracking is
+currently available; `track()` rechecks consent and the exact production host
+and returns whether it enqueued the event. The opt-out accessor also protects
+automatic or queued Google events when another context changes the cookie.
+
+Run the behavioral regressions with `node --test tests/*.test.cjs` (AI site:
+`node --test src/web/tests/*.test.cjs` from the repository root). Real production
+network/storage verification remains a separate deployment and acceptance gate.

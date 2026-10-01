@@ -48,10 +48,11 @@
   };
 
   window.EVHAnalytics = Object.freeze({
-    isLoaded: () => loaded,
+    isLoaded: () => loaded && isApprovedHost() && hasAnalyticsConsent(),
     track: (name, parameters) => {
-      if (!loaded) return;
+      if (!isApprovedHost() || !hasAnalyticsConsent() || !loaded) return false;
       window.gtag('event', name, parameters);
+      return true;
     }
   });
 
