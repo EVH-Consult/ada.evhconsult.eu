@@ -18,7 +18,7 @@ const hosts = ['evhconsult.eu', 'ai.evhconsult.eu', 'ada.evhconsult.eu', 'erwin.
 const id = 'ga-disable-G-QJKQTTXSF3';
 
 function realm(jar, host = hosts[0]) {
-  const listeners = {}, documentListeners = {}, timers = [], tags = [], writes = [];
+  const listeners = {}, documentListeners = {}, timers = [], tags = [], writes = [], dispatches = [];
   const listen = (map, name, fn) => (map[name] ||= []).push(fn);
   const emit = (map, event) => (map[event.type] || []).forEach(fn => fn(event));
   const elements = [];
@@ -43,21 +43,33 @@ function realm(jar, host = hosts[0]) {
       if (value.includes('Max-Age=0')) delete jar[name]; else jar[name] = val;
     }
   });
+  class ImageElement {
+    get src() { return this.value; }
+    set src(value) { this.value = value; dispatches.push({ transport: 'image', url: value }); }
+  }
+  class Xhr {
+    open(method, url) { this.url = url; }
+    send(body) { dispatches.push({ transport: 'xhr', url: this.url, body }); }
+    abort() { this.aborted = true; }
+  }
   const window = {
-    location: {hostname: host, pathname: '/'}, innerWidth: 1200,
+    navigator: {sendBeacon(url, data) {dispatches.push({transport: 'beacon', url, data}); return true;}},
+    fetch(input, options) {dispatches.push({transport: 'fetch', input, options}); return Promise.resolve(new Response(null, {status: 204}));},
+    HTMLImageElement: ImageElement, XMLHttpRequest: Xhr,
+    location: {hostname: host, pathname: '/', href: `https://${host}/`}, innerWidth: 1200,
     addEventListener: (n, f) => listen(listeners, n, f), dispatchEvent: e => emit(listeners, e),
     setInterval: f => {timers.push(f); return timers.length;},
     cookieStore: {addEventListener: (n, f) => listen(listeners, 'cookie-' + n, f)}
   };
   const context = vm.createContext({window, document, location: window.location,
     CustomEvent: class {constructor(type, options) {this.type = type; this.detail = options.detail;}},
-    HTMLElement: class {}, Date, Set, encodeURIComponent, decodeURIComponent});
+    HTMLElement: class {}, Date, Set, URL, Response, encodeURIComponent, decodeURIComponent});
   vm.runInContext(consentSource, context);
   vm.runInContext(gaSource, context);
   const fire = type => emit(listeners, {type});
   const commands = name => [...window.dataLayer].filter(args => args[0] === name);
   const latestConsent = () => commands('consent').at(-1)[2];
-  return {window, tags, writes, timers, fire, commands, latestConsent,
+  return {window, tags, writes, timers, fire, commands, latestConsent, dispatches,
     visible: () => emit(documentListeners, {type: 'visibilitychange'}),
     initUi: () => {emit(documentListeners, {type: 'DOMContentLoaded'}); return elements.find(e => e.className === 'evh-consent');}};
 }
@@ -69,7 +81,7 @@ for (const host of hosts) {
     a.fire('evh:analytics-consent-changed'); b.fire('evh:analytics-consent-changed');
     assert.equal(a.tags.length, 1); assert.equal(a.window[id], false);
     assert.equal(a.window.EVHAnalytics.track('fixture_before', {}), true);
-    // No callback in a has run yet: Google must see immediate opt-out at send.
+    // No callback in a has run yet: Google sees immediate event opt-out.
     jar.evh_analytics_consent = 'denied'; b.window.EVHConsent.synchronize();
     assert.equal(a.window[id], true);
     const eventCount = a.commands('event').length;
@@ -141,4 +153,48 @@ test('real native controls reverse and persist choice; expiry prompts again', ()
   delete jar.evh_analytics_consent; r.fire('pageshow');
   assert.equal(panel.hidden, false); assert.equal(accept.disabled, false); assert.equal(refuse.disabled, false);
   assert.equal(r.latestConsent().analytics_storage, 'denied');
+});
+
+
+test('buffered collection dispatch is blocked before synchronization callbacks', async () => {
+  for (const next of ['denied', null, '%broken']) {
+    const jar = {evh_analytics_consent: 'granted'}, r = realm(jar);
+    const endpoint = 'https://region1.google-analytics.com/g/collect?tid=G-QJKQTTXSF3';
+    const pending = new r.window.XMLHttpRequest(); pending.open('POST', endpoint);
+    if (next === null) delete jar.evh_analytics_consent; else jar.evh_analytics_consent = next;
+    assert.equal(r.window.navigator.sendBeacon(endpoint, 'queued'), true);
+    assert.equal((await r.window.fetch(new URL(endpoint), {method: 'POST', body: 'queued'})).status, 204);
+    assert.equal((await r.window.fetch({url: endpoint}, {method: 'POST'})).status, 204);
+    const image = new r.window.HTMLImageElement(); image.src = endpoint;
+    pending.send('queued'); assert.equal(pending.aborted, true);
+    assert.deepEqual(r.dispatches, []);
+  }
+});
+
+test('granted and regranted collection retains native transports', async () => {
+  const jar = {evh_analytics_consent: 'granted'}, r = realm(jar);
+  for (let cycle = 0; cycle < 2; cycle++) {
+    if (cycle) {jar.evh_analytics_consent = 'denied'; r.window.EVHConsent.synchronize(); jar.evh_analytics_consent = 'granted';}
+    const url = 'https://www.google-analytics.com/g/collect', options = {method: 'POST', body: 'sample'};
+    const count = r.dispatches.length;
+    assert.equal(r.window.navigator.sendBeacon(url, 'sample'), true);
+    await r.window.fetch(url, options);
+    const image = new r.window.HTMLImageElement(); image.src = url; assert.equal(image.src, url);
+    const xhr = new r.window.XMLHttpRequest(); xhr.open('POST', url); xhr.send('sample');
+    assert.deepEqual(r.dispatches.slice(count).map(d => d.transport), ['beacon', 'fetch', 'image', 'xhr']);
+    assert.equal(r.dispatches[count + 1].options, options);
+  }
+});
+
+test('denial leaves contact, reporting, assets and lookalike hosts native', async () => {
+  const r = realm({evh_analytics_consent: 'denied'});
+  for (const url of ['/api/contact', '/api/analytics-report?view=pages&days=7', '/images/logo.svg',
+    'https://google-analytics.com.attacker.test/g/collect', 'https://other.example/g/collect',
+    'https://www.googletagmanager.com/gtag/js?id=G-QJKQTTXSF3', 'https://www.google-analytics.com/other']) {
+    const count = r.dispatches.length;
+    r.window.navigator.sendBeacon(url, 'sample'); await r.window.fetch(url);
+    const image = new r.window.HTMLImageElement(); image.src = url;
+    const xhr = new r.window.XMLHttpRequest(); xhr.open('POST', url); xhr.send('sample');
+    assert.equal(r.dispatches.length - count, 4, url);
+  }
 });
